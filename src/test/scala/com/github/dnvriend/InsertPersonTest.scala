@@ -17,43 +17,43 @@
 package com.github.dnvriend
 
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType._
+import com.gu.scanamo.Scanamo
 import com.gu.scanamo.Scanamo._
+
+import scalaz._
+import scalaz.Scalaz._
 
 case class Person(name: String, age: Int)
 
 case class Counter(name: String, value: Int)
 
 class InsertPersonTest extends TestSpec {
-  it should "insert a person" in withClient { client =>
-    withTable("personTable", 'name -> S) { tableName =>
-      import com.gu.scanamo.syntax._
-      for {
-        _ <- Option(put(client)(tableName)(Person("dennis", 42)))
-        result <- get[Person](client)(tableName)('name -> "dennis")
-      } yield result shouldBe Right(Person("dennis", 42))
-    }
+  it should "insert a person" in withTable("personTable", 'name -> S) { client => tableName =>
+    import com.gu.scanamo.syntax._
+    Scanamo.put(client)(tableName)(Person("dennis", 42))
+    Scanamo.get[Person](client)(tableName)('name -> "dennis").value.disjunction should beRight(Person("dennis", 42))
   }
 
-  it should "update a person" in withClient { client =>
-    withTable("personTable", 'name -> S) { tableName =>
-      import com.gu.scanamo.syntax._
-      for {
-        _ <- Option(put(client)(tableName)(Person("dennis", 42))).toRight("")
-        updated <- update[Person](client)(tableName)('name -> "dennis", set('age -> 43))
-      } yield updated shouldBe Person("dennis", 43)
-    }
+  it should "update a person" in withTable("personTable", 'name -> S) { client => tableName =>
+    import com.gu.scanamo.syntax._
+    Scanamo.put(client)(tableName)(Person("dennis", 42))
+    Scanamo.update[Person](client)(tableName)('name -> "dennis", set('age -> 43)).disjunction should beRight(Person("dennis", 43))
   }
 
-  it should "update a counter" in withClient { client =>
-    withTable("counterTable", 'name -> S) { tableName =>
-      import com.gu.scanamo.syntax._
-      for {
-        Counter("c1", 1) <- update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
-        Counter("c1", 2) <- update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
-        Counter("c1", 3) <- update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
-        Counter("c1", 4) <- update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
-        result <- get[Counter](client)(tableName)('name -> "c1")
-      } yield result shouldBe Right(Counter("c1", 4))
-    }
+  it should "update a counter" in withTable("counterTable", 'name -> S) { client => tableName =>
+    import com.gu.scanamo.syntax._
+    for {
+      Counter("c1", 1) <- Scanamo.update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
+      Counter("c1", 2) <- Scanamo.update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
+      Counter("c1", 3) <- Scanamo.update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
+      Counter("c1", 4) <- Scanamo.update[Counter](client)(tableName)('name -> "c1", add('value -> 1)).toOption
+      result <- Scanamo.get[Counter](client)(tableName)('name -> "c1")
+    } yield result shouldBe Right(Counter("c1", 4))
+  }
+
+  it should "create a person" in withDynamoAndTable("personTable", 'name -> S) { dynamo =>
+    import com.gu.scanamo.syntax._
+    dynamo.put[Person](Person("foobar", 20))
+    dynamo.get[Person]('name -> "foobar") should beRight(Person("foobar", 20))
   }
 }

@@ -18,6 +18,7 @@ package com.github.dnvriend
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType
+import com.gu.scanamo.Scanamo
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{ FlatSpec, Matchers, OptionValues }
 import org.typelevel.scalatest.{ DisjunctionMatchers, ValidationMatchers }
@@ -39,11 +40,15 @@ abstract class TestSpec extends FlatSpec with Matchers with ValidationMatchers w
     try f(client) finally client.shutdown()
   }
 
-  def withTable(tableName: String, attributeDefinitions: (Symbol, ScalarAttributeType)*)(f: String => Unit): Unit = withClient { client =>
-    LocalDynamoDB.withTable[Unit](client)(tableName)(attributeDefinitions: _*)(f(tableName))
+  def withTable(tableName: String, attributeDefinitions: (Symbol, ScalarAttributeType)*)(f: AmazonDynamoDB => String => Unit): Unit = withClient { client =>
+    LocalDynamoDB.withTable[Unit](client)(tableName)(attributeDefinitions: _*)(f(client)(tableName))
   }
 
-  def withTableAndSecondaryIndex(tableName: String, primaryIndexAttributes: (Symbol, ScalarAttributeType)*)(secondaryIndexName: String, secondaryIndexAttributes: (Symbol, ScalarAttributeType)*)(f: String => Unit): Unit = withClient { client =>
-    LocalDynamoDB.withTableWithSecondaryIndex[Unit](client)(tableName, secondaryIndexName)(primaryIndexAttributes: _*)(secondaryIndexAttributes: _*)(f(tableName))
+  def withTableAndSecondaryIndex(tableName: String, primaryIndexAttributes: (Symbol, ScalarAttributeType)*)(secondaryIndexName: String, secondaryIndexAttributes: (Symbol, ScalarAttributeType)*)(f: AmazonDynamoDB => String => Unit): Unit = withClient { client =>
+    LocalDynamoDB.withTableWithSecondaryIndex[Unit](client)(tableName, secondaryIndexName)(primaryIndexAttributes: _*)(secondaryIndexAttributes: _*)(f(client)(tableName))
+  }
+
+  def withDynamoAndTable(tableName: String, attributeDefinitions: (Symbol, ScalarAttributeType)*)(f: Dynamo => Unit): Unit = withTable(tableName, attributeDefinitions: _*) { client => tableName =>
+    f(new Dynamo(client, tableName))
   }
 }
